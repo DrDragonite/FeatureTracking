@@ -229,6 +229,10 @@ class UI(Frame):
 			self.canvas.mouse_down = False
 			self.remove_focus()
 			if self.marker_mode:
+				x1 = x if x < self.canvas_selection.origin_x else self.canvas_selection.origin_x
+				y1 = y if y < self.canvas_selection.origin_y else self.canvas_selection.origin_y
+				x2 = x if x > self.canvas_selection.origin_x else self.canvas_selection.origin_x
+				y2 = y if y > self.canvas_selection.origin_y else self.canvas_selection.origin_y
 				self.canvas_selection.delete(self.canvas)
 				self.marker_mode.set(False)
 
