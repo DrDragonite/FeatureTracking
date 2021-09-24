@@ -290,7 +290,6 @@ class UI(Frame):
 		self.console.config(blockcursor=1, selectbackground="#9a9a9a", insertbackground="#9a9a9a", takefocus=0)
 		self.console.bind("<Key>", lambda x: "break")
 		self.console.bind("<FocusIn>", lambda x: "break")
-		self.console.insert("end", "> ")
 
 		self.setup_canvas(self.displayframe)
 		self.i_coords = InfoText(self.footer)
