@@ -163,6 +163,7 @@ class TransformManager:
 		self.update(canvas)
 
 	def update(self, canvas: Canvas) -> None:
+		"""Update the objects on the canvas."""
 		if not self.center_marker or not self.main_rect or not self.handles:
 			raise Exception("Please call 'create' function first")
 		rx1 = self.x1 if self.x1 < self.x2 else self.x2
@@ -193,6 +194,7 @@ class TransformManager:
 			canvas.coords(self.handles[i], hx - w/2, hy - w/2, hx + w/2, hy + w/2)
 	
 	def delete(self, canvas: Canvas) -> None:
+		"""Delete and reset the transform manager."""
 		if self.main_rect: canvas.delete(self.main_rect)
 		for i in range(9):
 			if i < 2  and self.center_marker: canvas.delete(self.center_marker[i])
@@ -218,10 +220,12 @@ class TransformManager:
 		self.update(canvas)
 
 	def set_offset(self, x, y) -> None:
+		"""Set the offset for movement."""
 		self.ox = x - self.x1
 		self.oy = y - self.y1
 
 	def reset_coords(self) -> None:
+		"""Order coordinates properly, making sure (x1, y1) is the top left corner."""
 		if self.x1 > self.x2:
 			self.x2 = self.x2 + self.x1
 			self.x1 = self.x2 - self.x1
@@ -232,14 +236,9 @@ class TransformManager:
 			self.y2 = self.y2 - self.y1
 
 	def coords(self) -> tuple:
+		"""Get the transformation coordinates: (x1, y1, x2, y2)"""
 		self.reset_coords()
 		return (self.x1, self.y1, self.x2, self.y2)
-
-	def is_inside(self, x: int, y: int, margin: int = 0):
-		return x < self.x2 + margin and x > self.x1 - margin and y < self.y2 + margin and y > self.y1 - margin
-	
-	def is_outside(self, x: int, y: int, margin: int = 0):
-		return x >= self.x2 + margin or x <= self.x1 - margin or y >= self.y2 + margin or y <= self.y1 - margin
 
 class ChooseImage:
 	def __init__(self) -> None:
@@ -266,9 +265,9 @@ class UI(Frame):
 		self.root.resizable(0, 0)
 		#root.wm_attributes("-toolwindow", "true")
 
-		self.transform_mode = TransformSwitch()
 		self.transform_state = Switch()
-		self.marker_mode = Switch()
+		self.transform_mode = TransformSwitch()
+		self.marker_state = Switch()
 		self.m_movement = 0
 		self.create_ui()
 
@@ -297,35 +296,38 @@ class UI(Frame):
 		self.i_coords.pack(anchor="nw")
 		self.i_coords.set(x=0, y=0)
 
-		self.marker_mode.onchange = self.change_marker_button_state
-		self.draw_marker_button = Button(self.sideframe, text="Draw marker", command=self.marker_mode.toggle)
+		self.marker_state.onchange = self.change_marker_button_state
+		self.draw_marker_button = Button(self.sideframe, text="Draw marker", command=self.marker_state.toggle)
 		self.draw_marker_button.pack(side="top", pady=5)
 
 		self.load_image_button = Button(self.sideframe, text="Load image", command=self.load_image_to_canvas)
 		self.load_image_button.pack(side="top", pady=5)
 
 	def remove_focus(self):
+		"""Remove focus from a text area."""
 		self.root.focus_set()
 
 	def load_image_to_canvas(self):
-		img = ChooseImage()
+		img = ChooseImage() # needs to be a class because it doesn't work otherwise
 		if not img: return
 		self.canvas.create_image(self.canvas.winfo_width()/2, self.canvas.winfo_height()/2, image=img, anchor="center")
 
 	def change_marker_button_state(self, state):
-		if state:
-			self.draw_marker_button.config(fg="red", relief="sunken")
-		else:
-			self.draw_marker_button.config(fg="black", relief="raised")
+		# change button style
+		if state: self.draw_marker_button.config(fg="red", relief="sunken")
+		else: self.draw_marker_button.config(fg="black", relief="raised")
 
 	def setup_canvas(self, parent: Widget):
 		def coords(event):
+			"""Get X and Y coordinates from a mouse event."""
 			return (int(event.x), int(event.y))
 		
 		def point_intersects_square_xyw(x, y, square_x, square_y, square_rad):
+			"""Return whether a point (x, y) intersects with a square centered at (square_x, square_y) with size (2 * square_rad)"""
 			return x >= square_x - square_rad and x <= square_x + square_rad and y >= square_y - square_rad and y <= square_y + square_rad
 
 		def point_intersects_rect_xyxy(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
+			"""Returns whether a point (x, y) intersects with a given rectangle (rect_x1, rect_y1, rect_x2, rect_y2)"""
 			return x >= rect_x1 and x <= rect_x2 and y >= rect_y1 and y <= rect_y2
 
 		def set_mode(x, y):
@@ -353,30 +355,37 @@ class UI(Frame):
 				self.transform_mode.set("none")
 
 		def mouse_click(event):
+			# get event coords
 			x, y = coords(event)
 			self.canvas.mouse_down = True
 			if self.transform_state:
+				# if user clicks away, remove the transform
 				if self.transform_mode == "none":
 					self.transform_state.set(False)
 					self.canvas_transform.delete(self.canvas)
 				set_mode(x, y)
 				self.canvas_transform.set_offset(x, y)
 				self.canvas.config(cursor=self.transform_mode.to_cursor())
-			if self.marker_mode:
+			if self.marker_state:
 				self.canvas_selection.create(self.canvas, x, y, outline="red", dash=(3, 5), fill=None)
 
 		def mouse_move(event):
+			# limit the amount of times the event is executed
 			self.m_movement += 1
 			if self.m_movement % 2: return
+			# get event coords
 			x, y = coords(event)
+			# update the footer info
 			self.i_coords.set(x=x, y=y)
 			if self.transform_state:
+				# if the mouse is held down, perform the scaling transformation
 				if self.canvas.mouse_down:
 					self.canvas_transform.adjust(self.canvas, self.transform_mode, x, y)
+				# if it's not, just update the cursor
 				if not self.canvas.mouse_down:
 					set_mode(x, y)
 					self.canvas.config(cursor=self.transform_mode.to_cursor())
-			if self.marker_mode and self.canvas.mouse_down:
+			if self.marker_state and self.canvas.mouse_down:
 				self.canvas_selection.adjust(self.canvas, x, y)
 
 		def mouse_release(event):
@@ -386,12 +395,14 @@ class UI(Frame):
 			if self.transform_state:
 				set_mode(x, y)
 				self.canvas.config(cursor=self.transform_mode.to_cursor())
-			if self.marker_mode:
+			if self.marker_state:
+				# use the selection coordinates to create a transformer
 				x1, y1, x2, y2 = self.canvas_selection.delete(self.canvas)
-				self.marker_mode.set(False)
+				self.marker_state.set(False)
 				self.canvas_transform.create(self.canvas, x1, y1, x2, y2)
 				self.transform_state.set(True)
-
+		
+		# set up the canvas and local variables
 		self.canvas_selection = SelectionManager()
 		self.canvas_transform = TransformManager()
 		self.canvas = Canvas(parent, bg="white")
