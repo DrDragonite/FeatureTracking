@@ -68,52 +68,33 @@ class Selection:
 class SelectionManager:
 	def __init__(self) -> None:
 		self.shape_id = None
-		self.origin_x = 0
-		self.origin_y = 0
+		self.x1 = 0
+		self.y1 = 0
+		self.x2 = 0
+		self.y2 = 0
 
 	def create(self, canvas: Canvas, x: int, y: int, **kwargs) -> None:
 		self.shape_id = canvas.create_rectangle(x, y, x, y, **kwargs)
-		self.origin_x = x
-		self.origin_y = y
+		self.x1, self.y1, self.x2, self.y2 = (x, y, x, y)
 	
 	def adjust(self, canvas: Canvas, x: int, y: int) -> None:
 		if not self.shape_id: return
-		rx1, ry1, rx2, ry2 = canvas.coords(self.shape_id)
-		if x < self.origin_x: rx1 = x
-		else: rx2 = x
-		if y < self.origin_y: ry1 = y
-		else: ry2 = y
+		self.x2, self.y2 = (x, y)
+		rx1 = self.x1 if self.x1 < self.x2 else self.x2
+		ry1 = self.y1 if self.y1 < self.y2 else self.y2
+		rx2 = self.x1 if self.x1 > self.x2 else self.x2
+		ry2 = self.y1 if self.y1 > self.y2 else self.y2
 		canvas.coords(self.shape_id, rx1, ry1, rx2, ry2)
 	
-	def delete(self, canvas: Canvas) -> None:
+	def delete(self, canvas: Canvas) -> tuple:
 		canvas.delete(self.shape_id)
-		origin = (self.origin_x, self.origin_y)
-		self.shape_id = None
-		self.origin_x = 0
-		self.origin_y = 0
-		return origin
-
-class TransformManager:
-	def __init__(self) -> None:
-		self.allow_scaling = True
-		self.fixed_radtio  = False
-		self.main_rect     = None
-		self.handles       = [None] * 8
-		self.object        = None
-		self.x1            = 0
-		self.y1            = 0
-		self.x2            = 0
-		self.y2            = 0
-	
-	def create(self, canvas: Canvas, object: int):
-		# create surrounding rectangle
-		x1, y1, x2, y2 = canvas.coords(object)
-		self.main_rect = canvas.create_rectangle(x1, y1, x2, y2, outline="#558ef0", fill=None)
-		
-		# create the little handles
-		self.handles[0] = canvas.create_rectangle(x2)
-
-
+		x1 = self.x1 if self.x1 < self.x2 else self.x2
+		y1 = self.y1 if self.y1 < self.y2 else self.y2
+		x2 = self.x1 if self.x1 > self.x2 else self.x2
+		y2 = self.y1 if self.y1 > self.y2 else self.y2
+		coords = (x1, y1, x2, y2)
+		self.__init__()
+		return coords
 
 class Switch:
 	def __init__(self) -> None:
@@ -123,14 +104,142 @@ class Switch:
 	def __len__(self) -> bool:
 		return self.state
 
+	def __repr__(self) -> str:
+		return str(self.state)
+	
+	def __eq__(self, other) -> bool:
+		return self.state == other
+
 	def set(self, state: bool):
-		if self.state != bool(state): 
+		if self.state != bool(state):
 			if self.onchange: self.onchange(bool(state))
 		self.state = bool(state)
 	
 	def toggle(self):
 		self.state = not self.state
 		if self.onchange: self.onchange(self.state)
+
+class TransformSwitch:
+	def __init__(self) -> None:
+		self.state = "none"
+		self.states = ["move", "topleft", "top", "topright", "right", "bottomright", "bottom", "bottomleft", "left", "none"]
+		self.onchange = None
+
+	def __repr__(self) -> str:
+		return str(self.state)
+
+	def __eq__(self, other) -> bool:
+		return self.state == str(other).lower()
+	
+	def set(self, state: str):
+		state = str(state).lower()
+		if not state in self.states: return 
+		if self.state != state:
+			if self.onchange: self.onchange(state)
+		self.state = state
+	
+	def to_cursor(self):
+		return ["fleur", "top_left_corner", "top_side", "top_right_corner", "right_side", "bottom_right_corner", "bottom_side", "bottom_left_corner", "left_side", ""][self.states.index(self.state)]
+
+class TransformManager:
+	def __init__(self) -> None:
+		self.show_handles  = True
+		self.fixed_radtio  = False
+		self.center_marker = None
+		self.main_rect     = None
+		self.handles       = None
+		self.x1            = 0
+		self.y1            = 0
+		self.x2            = 0
+		self.y2            = 0
+		self.ox            = 0
+		self.oy            = 0
+	
+	def create(self, canvas: Canvas, x1: int, y1: int, x2: int, y2: int) -> None:
+		self.x1, self.y1, self.x2, self.y2 = (x1, y1, x2, y2)
+		self.main_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#558ef0", fill=None)
+		self.center_marker = [canvas.create_line(0, 0, 0, 0, fill="#558ef0") for i in range(2)]
+		self.handles = [canvas.create_rectangle(0, 0, 0, 0, outline="#558ef0", fill="#ffffff") if i != 4 else None for i in range(9)]
+		self.update(canvas)
+
+	def update(self, canvas: Canvas) -> None:
+		if not self.center_marker or not self.main_rect or not self.handles:
+			raise Exception("Please call 'create' function first")
+		rx1 = self.x1 if self.x1 < self.x2 else self.x2
+		ry1 = self.y1 if self.y1 < self.y2 else self.y2
+		rx2 = self.x1 if self.x1 > self.x2 else self.x2
+		ry2 = self.y1 if self.y1 > self.y2 else self.y2
+		canvas.coords(self.main_rect, rx1, ry1, rx2, ry2)
+
+		cx = round(rx1+(rx2-rx1)/2)
+		cy = round(ry1+(ry2-ry1)/2)
+		canvas.coords(self.center_marker[0], cx-3, cy,   cx+4, cy)
+		canvas.coords(self.center_marker[1], cx,   cy-3, cx,   cy+4)
+
+		for i in range(9):
+			if i == 4: continue
+			# if show_handles is false, hide the handles
+			if self.show_handles: canvas.itemconfig(self.handles[i], state="normal")
+			else: canvas.itemconfig(self.handles[i], state="hidden"); continue
+			# if fixed_ratio is true, hide the in-between handles
+			if self.fixed_radtio and not (i+1) % 2: canvas.itemconfig(self.handles[i], state="hidden"); continue
+			else: canvas.itemconfig(self.handles[i], state="normal")
+
+			x = int(i % 3)
+			y = int(i / 3)
+			w = 6 + (1 * ((i+1) % 2))  # make corners bigger
+			hx = rx1 + x * abs(rx2-rx1)/2
+			hy = ry1 + y * abs(ry2-ry1)/2
+			canvas.coords(self.handles[i], hx - w/2, hy - w/2, hx + w/2, hy + w/2)
+	
+	def delete(self, canvas: Canvas) -> None:
+		if self.main_rect: canvas.delete(self.main_rect)
+		for i in range(9):
+			if i < 2  and self.center_marker: canvas.delete(self.center_marker[i])
+			if i != 4 and self.handles: canvas.delete(self.handles[i])
+		self.__init__()
+	
+	def adjust(self, canvas: Canvas, mode: TransformSwitch, x: int, y: int) -> None:
+		if "top" in mode.state:
+			self.y1 = y
+		if "right" in mode.state:
+			self.x2 = x
+		if "bottom" in mode.state:
+			self.y2 = y
+		if "left" in mode.state:
+			self.x1 = x
+		if "move" in mode.state:
+			w  = self.x2 - self.x1
+			h  = self.y2 - self.y1
+			self.x1 = x - self.ox
+			self.y1 = y - self.oy
+			self.x2 = self.x1 + w
+			self.y2 = self.y1 + h
+		self.update(canvas)
+
+	def set_offset(self, x, y) -> None:
+		self.ox = x - self.x1
+		self.oy = y - self.y1
+
+	def reset_coords(self) -> None:
+		if self.x1 > self.x2:
+			self.x2 = self.x2 + self.x1
+			self.x1 = self.x2 - self.x1
+			self.x2 = self.x2 - self.x1
+		if self.y1 > self.y2:
+			self.y2 = self.y2 + self.y1
+			self.y1 = self.y2 - self.y1
+			self.y2 = self.y2 - self.y1
+
+	def coords(self) -> tuple:
+		self.reset_coords()
+		return (self.x1, self.y1, self.x2, self.y2)
+
+	def is_inside(self, x: int, y: int, margin: int = 0):
+		return x < self.x2 + margin and x > self.x1 - margin and y < self.y2 + margin and y > self.y1 - margin
+	
+	def is_outside(self, x: int, y: int, margin: int = 0):
+		return x >= self.x2 + margin or x <= self.x1 - margin or y >= self.y2 + margin or y <= self.y1 - margin
 
 class ChooseImage:
 	def __init__(self) -> None:
@@ -143,8 +252,6 @@ class ChooseImage:
 		if not filepath: return
 		self.image = image = ImageTk.PhotoImage(Image.open(filepath))
 		return image
-
-
 
 folder = __file__[:__file__.rfind("/")+1]
 
@@ -159,7 +266,10 @@ class UI(Frame):
 		self.root.resizable(0, 0)
 		#root.wm_attributes("-toolwindow", "true")
 
+		self.transform_mode = TransformSwitch()
+		self.transform_state = Switch()
 		self.marker_mode = Switch()
+		self.m_movement = 0
 		self.create_ui()
 
 	def create_ui(self):
@@ -210,17 +320,62 @@ class UI(Frame):
 
 	def setup_canvas(self, parent: Widget):
 		def coords(event):
-			return (event.x, event.y)
+			return (int(event.x), int(event.y))
+		
+		def point_intersects_square_xyw(x, y, square_x, square_y, square_rad):
+			return x >= square_x - square_rad and x <= square_x + square_rad and y >= square_y - square_rad and y <= square_y + square_rad
+
+		def point_intersects_rect_xyxy(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
+			return x >= rect_x1 and x <= rect_x2 and y >= rect_y1 and y <= rect_y2
+
+		def set_mode(x, y):
+			select_rad = 10
+			x1, y1, x2, y2 = self.canvas_transform.coords()
+			if   point_intersects_square_xyw(x, y, x1, y1, select_rad): # top left
+				self.transform_mode.set("topleft")
+			elif point_intersects_square_xyw(x, y, x2, y1, select_rad): # top right
+				self.transform_mode.set("topright")
+			elif point_intersects_square_xyw(x, y, x1, y2, select_rad): # bottom left
+				self.transform_mode.set("bottomleft")
+			elif point_intersects_square_xyw(x, y, x2, y2, select_rad): # bottom right
+				self.transform_mode.set("bottomright")
+			elif self.canvas_transform.is_inside(x, y): # middle (move)
+				self.transform_mode.set("move")
+			elif point_intersects_rect_xyxy(x, y, x1, y1 - select_rad, x2, y2): # top
+				self.transform_mode.set("top")
+			elif point_intersects_rect_xyxy(x, y, x2, y1, x2 + select_rad, y2): # right
+				self.transform_mode.set("right")
+			elif point_intersects_rect_xyxy(x, y, x1, y2, x2, y2 + select_rad): # bottom
+				self.transform_mode.set("bottom")
+			elif point_intersects_rect_xyxy(x, y, x1 - select_rad, y1, x1, y2): # left
+				self.transform_mode.set("left")
+			else:
+				self.transform_mode.set("none")
 
 		def mouse_click(event):
 			x, y = coords(event)
 			self.canvas.mouse_down = True
+			if self.transform_state:
+				if self.transform_mode == "none":
+					self.transform_state.set(False)
+					self.canvas_transform.delete(self.canvas)
+				set_mode(x, y)
+				self.canvas_transform.set_offset(x, y)
+				self.canvas.config(cursor=self.transform_mode.to_cursor())
 			if self.marker_mode:
 				self.canvas_selection.create(self.canvas, x, y, outline="red", dash=(3, 5), fill=None)
 
 		def mouse_move(event):
+			self.m_movement += 1
+			if self.m_movement % 2: return
 			x, y = coords(event)
 			self.i_coords.set(x=x, y=y)
+			if self.transform_state:
+				if self.canvas.mouse_down:
+					self.canvas_transform.adjust(self.canvas, self.transform_mode, x, y)
+				if not self.canvas.mouse_down:
+					set_mode(x, y)
+					self.canvas.config(cursor=self.transform_mode.to_cursor())
 			if self.marker_mode and self.canvas.mouse_down:
 				self.canvas_selection.adjust(self.canvas, x, y)
 
@@ -228,13 +383,14 @@ class UI(Frame):
 			x, y = coords(event)
 			self.canvas.mouse_down = False
 			self.remove_focus()
+			if self.transform_state:
+				set_mode(x, y)
+				self.canvas.config(cursor=self.transform_mode.to_cursor())
 			if self.marker_mode:
-				x1 = x if x < self.canvas_selection.origin_x else self.canvas_selection.origin_x
-				y1 = y if y < self.canvas_selection.origin_y else self.canvas_selection.origin_y
-				x2 = x if x > self.canvas_selection.origin_x else self.canvas_selection.origin_x
-				y2 = y if y > self.canvas_selection.origin_y else self.canvas_selection.origin_y
-				self.canvas_selection.delete(self.canvas)
+				x1, y1, x2, y2 = self.canvas_selection.delete(self.canvas)
 				self.marker_mode.set(False)
+				self.canvas_transform.create(self.canvas, x1, y1, x2, y2)
+				self.transform_state.set(True)
 
 		self.canvas_selection = SelectionManager()
 		self.canvas_transform = TransformManager()
