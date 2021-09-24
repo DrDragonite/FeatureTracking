@@ -339,7 +339,7 @@ class UI(Frame):
 				self.transform_mode.set("bottomleft")
 			elif point_intersects_square_xyw(x, y, x2, y2, select_rad): # bottom right
 				self.transform_mode.set("bottomright")
-			elif self.canvas_transform.is_inside(x, y): # middle (move)
+			elif point_intersects_rect_xyxy(x, y, x1, y1, x2, y2): # middle (move)
 				self.transform_mode.set("move")
 			elif point_intersects_rect_xyxy(x, y, x1, y1 - select_rad, x2, y2): # top
 				self.transform_mode.set("top")
