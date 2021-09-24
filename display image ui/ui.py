@@ -139,7 +139,7 @@ class TransformSwitch:
 		self.state = state
 	
 	def to_cursor(self):
-		return ["fleur", "top_left_corner", "top_side", "top_right_corner", "right_side", "bottom_right_corner", "bottom_side", "bottom_left_corner", "left_side", ""][self.states.index(self.state)]
+		return ["fleur", "size_nw_se", "size_ns", "size_ne_sw", "size_we", "size_nw_se", "size_ns", "size_ne_sw", "size_we", ""][self.states.index(self.state)]
 
 class TransformManager:
 	def __init__(self) -> None:
@@ -188,7 +188,8 @@ class TransformManager:
 
 			x = int(i % 3)
 			y = int(i / 3)
-			w = 6 + (1 * ((i+1) % 2))  # make corners bigger
+			#w = 6 + (1 * ((i+1) % 2))  # make corners bigger
+			w = 7
 			hx = rx1 + x * abs(rx2-rx1)/2
 			hy = ry1 + y * abs(ry2-ry1)/2
 			canvas.coords(self.handles[i], hx - w/2, hy - w/2, hx + w/2, hy + w/2)
