@@ -341,16 +341,16 @@ class UI(Frame):
 				self.transform_mode.set("bottomleft")
 			elif point_intersects_square_xyw(x, y, x2, y2, select_rad): # bottom right
 				self.transform_mode.set("bottomright")
+			elif point_intersects_rect_xyxy(x, y, x1, y1 - select_rad, x2, y1 + select_rad): # top
+				self.transform_mode.set("top")
+			elif point_intersects_rect_xyxy(x, y, x2 - select_rad, y1, x2 + select_rad, y2): # right
+				self.transform_mode.set("right")
+			elif point_intersects_rect_xyxy(x, y, x1, y2 - select_rad, x2, y2 + select_rad): # bottom
+				self.transform_mode.set("bottom")
+			elif point_intersects_rect_xyxy(x, y, x1 - select_rad, y1, x1 + select_rad, y2): # left
+				self.transform_mode.set("left")
 			elif point_intersects_rect_xyxy(x, y, x1, y1, x2, y2): # middle (move)
 				self.transform_mode.set("move")
-			elif point_intersects_rect_xyxy(x, y, x1, y1 - select_rad, x2, y2): # top
-				self.transform_mode.set("top")
-			elif point_intersects_rect_xyxy(x, y, x2, y1, x2 + select_rad, y2): # right
-				self.transform_mode.set("right")
-			elif point_intersects_rect_xyxy(x, y, x1, y2, x2, y2 + select_rad): # bottom
-				self.transform_mode.set("bottom")
-			elif point_intersects_rect_xyxy(x, y, x1 - select_rad, y1, x1, y2): # left
-				self.transform_mode.set("left")
 			else:
 				self.transform_mode.set("none")
 
