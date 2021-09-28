@@ -22,7 +22,7 @@ class Tracker:
 
 	def tk_draw(self, canvas):
 		if not self.fg_rect: self.fg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
-		if not self.bg_rect: self.bg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None, dash=(3, 5))
+		if not self.bg_rect: self.bg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
 		x1, y1, x2, y2 = self.fg_coords()
 		canvas.coords(self.fg_rect, x1, y1, x2, y2)
 		x1, y1, x2, y2 = self.bg_coords()
