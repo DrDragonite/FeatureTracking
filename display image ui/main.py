@@ -491,7 +491,7 @@ class UI(tk.Frame):
 
 		def mouse_move(event):
 			self.m_movement += 1
-			if self.m_movement % 5: return
+			if self.m_movement % 2: return
 			# get event coords
 			x, y = coords(event)
 			# update the footer info
