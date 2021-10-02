@@ -665,6 +665,7 @@ class UI(tk.Frame):
 				self.canvas_transform.reset_coords()
 				self.canvas.config(cursor=self.transform_mode.to_cursor())
 			if self.marker_state:
+				self.deselect_object()
 				# create a Tracker at marker coordinates and select it
 				x1, y1, x2, y2 = self.canvas_marker.delete(self.canvas)
 				self.marker_state.set(False)
