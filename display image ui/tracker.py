@@ -5,8 +5,8 @@ MODES  = ("TOPLEFT", "CENTER")
 class Tracker:
 	def __init__(self, x: float, y: float, width: float, height: float, *, bg_margin: float = 10, mode: str = "CENTER") -> None:
 		self.set(x=x, y=y, width=width, height=height, bg_margin=bg_margin, mode=mode)
-		self.fg_rect = None
-		self.bg_rect = None
+		self.i_fg_rect = None
+		self.i_bg_rect = None
 
 	def set(self, x=None, y=None, width=None, height=None, bg_margin=None, mode=None) -> None:
 		self.x         = x         if isinstance(x, NUMBER)         else self.x
@@ -21,16 +21,16 @@ class Tracker:
 		self.mode = mode if mode else self.mode
 
 	def tk_draw(self, canvas):
-		if not self.fg_rect: self.fg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
-		if not self.bg_rect: self.bg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
+		if not self.i_fg_rect: self.i_fg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
+		if not self.i_bg_rect: self.i_bg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
 		x1, y1, x2, y2 = self.fg_coords()
-		canvas.coords(self.fg_rect, x1, y1, x2, y2)
+		canvas.coords(self.i_fg_rect, x1, y1, x2, y2)
 		x1, y1, x2, y2 = self.bg_coords()
-		canvas.coords(self.bg_rect, x1, y1, x2, y2)
+		canvas.coords(self.i_bg_rect, x1, y1, x2, y2)
 
 	def tk_undraw(self, canvas):
-		if self.fg_rect: canvas.delete(self.fg_rect)
-		if self.bg_rect: canvas.delete(self.bg_rect)
+		if self.i_fg_rect: canvas.delete(self.i_fg_rect)
+		if self.i_bg_rect: canvas.delete(self.i_bg_rect)
 
 	def fg_coords(self):
 		self.set()
@@ -122,4 +122,4 @@ class Tracker:
 
 	def __str__(self) -> str:
 		self.set()
-		return "Tracker(x={}, y={}, w={}, h={}, bw={}, bh={}, bm={}, cm={})".format(self.x, self.y, self.width, self.height, self.bg_width, self.bg_height, self.bg_margin, self.mode)
+		return "Tracker(x={}, y={}, w={}, h={}, bw={}, bh={}, bm={}, m={})".format(self.x, self.y, self.width, self.height, self.bg_width, self.bg_height, self.bg_margin, self.mode)

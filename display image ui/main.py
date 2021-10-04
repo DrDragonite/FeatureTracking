@@ -1,6 +1,7 @@
+from itertools import count
 from math import exp
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from tkinter.scrolledtext import ScrolledText
 from tracker import Tracker
 from PIL import ImageTk
@@ -41,20 +42,24 @@ class InfoText(tk.Label):
 		self.text = tk.StringVar()
 		super().__init__(textvariable=self.text, *args, **kwargs)
 		self.infodict = {}
+		self.infodict["scene"] = ""
 
 	def update_info(self):
 		arr = []
 		for key, value in self.infodict.items():
+			if key == "scene": continue
 			arr.append(f"{key}: {value}")
-		self.text.set(", ".join(arr))
+		self.text.set(f"scene: {self.infodict['scene']} | " + ", ".join(arr))
 		self.update()
 	
 	def set(self, **kwargs):
 		for key, value in kwargs.items():
 			self.infodict[key] = value
+			if key == "scene" and value == "":
+				self.infodict[key] = "<Unknown>"
 		self.update_info()
 
-class ObjectInfo():
+class ObjectInfo:
 	def __init__(self, root, prop_list: list) -> None:
 		self.prop = prop_list
 		self.root = root
@@ -362,19 +367,136 @@ class TransformManager:
 		if y1 > y2: y2 = y2 + y1; y1 = y2 - y1; y2 = y2 - y1
 		return (x1, y1, x2, y2)
 
-class ChooseImage:
-	def __init__(self) -> None:
-		self.image = 0
-	
-	def __new__(self) -> ImageTk.PhotoImage:
-		from PIL import Image, ImageTk
-		from tkinter import filedialog
-		filepath = filedialog.askopenfilename(initialdir=folder+"src", title="Load an image", filetypes=(("Image files", ("*.png", "*.gif*", "*.jpg", "*.jpeg")), ("All files", ("*.*"))))
-		if not filepath: return
-		self.image = image = ImageTk.PhotoImage(Image.open(filepath))
-		return image
+images = []
+def choose_image():
+	from PIL import Image, ImageTk
+	from tkinter import filedialog
+	filepath = filedialog.askopenfilename(initialdir=__location__+"src", title="Load an image", filetypes=(("Image files", ("*.png", "*.gif*", "*.jpg", "*.jpeg")), ("All files", ("*.*"))))
+	if not filepath: return
+	images.append(ImageTk.PhotoImage(Image.open(filepath)))
+	return (images[-1], filepath)
 
-folder = __file__[:__file__.rfind("/")+1]
+def create_image(filepath):
+	from PIL import Image, ImageTk
+	from tkinter import filedialog
+	if not filepath: return
+	images.append(ImageTk.PhotoImage(Image.open(filepath)))
+	return (images[-1], filepath)
+
+def choose_name(root: tk.Tk, text: str = "Enter a name:"):
+	w, h, wx, wy, ww, wh = (300, 100, root.winfo_x(), root.winfo_y(), root.winfo_width(), root.winfo_height())
+	new_window = tk.Toplevel(root)
+	new_window.geometry("%dx%d+%d+%d" % (w, h, wx + (ww - w) //2, wy + (wh - h) // 2))
+	new_window.resizable(0, 0)
+	new_window.title("Input")
+	new_window.grab_set()
+
+	string_var = tk.StringVar()
+
+	def window_exit():
+		string_var.set("")
+		new_window.quit()
+		new_window.destroy()
+	
+	def window_submit(*a):
+		new_window.quit()
+		new_window.destroy()
+
+	l1 = tk.Label(new_window, text=text, font=("TkDefaultFont", 9))
+	l1.pack(anchor="nw")
+
+	entry = ttk.Entry(new_window, width=40, textvariable=string_var)
+	entry.pack(anchor="center", expand=1, ipadx=2, ipady=2)
+
+	cancel_button = ttk.Button(new_window, text="Cancel", command=window_exit)
+	cancel_button.pack(anchor="se", side="right", padx=4, pady=4)
+
+	ok_button = ttk.Button(new_window, text="OK", command=window_submit)
+	ok_button.pack(anchor="se", side="right", pady=4)
+
+	new_window.protocol("WM_DELETE_WINDOW", window_exit)
+	entry.bind("<Return>", window_submit)
+	entry.focus_force()
+
+	new_window.mainloop()
+	return string_var.get()
+
+def choose_scene(root: tk.Tk, scenes: dict):
+	w, h, wx, wy, ww, wh = (300, 300, root.winfo_x(), root.winfo_y(), root.winfo_width(), root.winfo_height())
+	new_window = tk.Toplevel(root)
+	new_window.geometry("%dx%d+%d+%d" % (w, h, wx + (ww - w) //2, wy + (wh - h) // 2))
+	new_window.resizable(0, 0)
+	new_window.title("Input")
+	new_window.grab_set()
+
+	new_window.columnconfigure(0, weight=1)
+	new_window.rowconfigure(0, weight=1)
+	string_var = tk.StringVar()
+
+	def window_exit():
+		string_var.set("")
+		new_window.quit()
+		new_window.destroy()
+	
+	def window_submit(*a):
+		new_window.quit()
+		new_window.destroy()
+
+	tree = ttk.Treeview(new_window, selectmode="none")
+	tree.grid(row=0, column=0, columnspan=3, sticky="nsew")
+
+	scroll_y = ttk.Scrollbar(new_window, orient="vertical")
+	scroll_y.grid(row=0, column=3, sticky="nse")
+
+	scroll_x = ttk.Scrollbar(new_window, orient="horizontal")
+	scroll_x.grid(row=1, column=0, columnspan=3, sticky="new")
+
+	label = tk.Label(new_window, textvariable=string_var)
+	label.grid(row=2, column=0, sticky="w")
+
+	select = ttk.Button(new_window, text='Select', command=window_submit)
+	select.grid(row=2, column=1, sticky="ew")
+
+	cancel = ttk.Button(new_window, text='Cancel', command=window_exit)
+	cancel.grid(row=2, column=2, columnspan=2, sticky="ew")
+
+	scroll_x.configure(command=tree.xview)
+	scroll_y.configure(command=tree.yview)
+	tree.configure(xscroll=scroll_x.set, yscroll=scroll_y.set)
+	tree.heading("#0", text="Scenes", anchor="w")
+	tree.column("#0", minwidth=1000)
+
+	def place_items(item, parent=""):
+		for key, val in item.items():
+			if isinstance(val, dict):
+				tags = ("scene",) if parent == "" else ()
+				par = tree.insert(parent, "end", text=key, open=0, tags=tags)
+				place_items(val, par)
+			else:
+				tree.insert(parent, "end", text=f"{key}: {val}")
+	
+	def on_click(event):
+		treeview: ttk.Treeview = event.widget
+		item = treeview.identify_row(event.y)
+		if item:
+			tags = treeview.item(item, 'tags')
+			if tags and (tags[0] == 'scene'):
+				treeview.selection_set(item)
+				name = treeview.item(item, "text")
+				string_var.set(name)
+
+	place_items(scenes)
+	tree.selection_set("I001")
+	string_var.set(tree.item("I001", "text"))
+	tree.bind("<Button-1>", on_click)
+	new_window.bind("<Return>", window_submit)
+	new_window.protocol("WM_DELETE_WINDOW", window_exit)
+
+	new_window.mainloop()
+	return string_var.get()
+
+__location__ = __file__[:__file__.rfind("/")+1]
+__scene_file__ = "objects.json"
 objects = []
 
 class UI(tk.Frame):
@@ -393,6 +515,8 @@ class UI(tk.Frame):
 		self.transform_state = BoolSwitch()
 		self.transform_mode = TransformSwitch()
 		self.marker_state = BoolSwitch()
+		self.scene_changed = BoolSwitch()
+		self.scene_name = ""
 		self.m_movement = 0
 		self.create_ui()
 
@@ -419,9 +543,15 @@ class UI(tk.Frame):
 		# self.console.bind("<FocusIn>", lambda x: "break")
 
 		self.setup_canvas(self.displayframe)
-		self.i_coords = InfoText(self.footer)
-		self.i_coords.pack(anchor="nw")
-		self.i_coords.set(x=0, y=0)
+
+		def scene_changed(changed):
+			if changed: self.info_text.set(scene=self.scene_name+"*" if self.scene_name else "<Unnamed>*")
+
+		self.info_text = InfoText(self.footer)
+		self.info_text.pack(anchor="nw")
+		self.info_text.set(scene=self.scene_name, x=0, y=0)
+		self.scene_changed.onchange = scene_changed
+
 
 		self.marker_state.onchange = self.change_marker_button_state
 		self.draw_marker_button = tk.Button(self.sidebar, text="Draw marker", command=self.marker_state.toggle)
@@ -429,6 +559,12 @@ class UI(tk.Frame):
 
 		self.load_image_button = tk.Button(self.sidebar, text="Load image", command=self.load_image_to_canvas)
 		self.load_image_button.pack(side="top", pady=5)
+
+		self.save_scene_button = tk.Button(self.sidebar, text="Save Scene", command=self.save_scene)
+		self.save_scene_button.pack(side="top", pady=5)
+
+		self.load_scene_button = tk.Button(self.sidebar, text="Load Scene", command=self.load_scene)
+		self.load_scene_button.pack(side="top", pady=5)
 
 		separator = ttk.Separator(self.sidebar, orient="horizontal")
 		separator.pack(fill="x", padx=5, pady=5)
@@ -441,15 +577,101 @@ class UI(tk.Frame):
 		"""Remove focus from a text area."""
 		self.root.focus_set()
 
-	def load_image_to_canvas(self):
+	def save_scene(self):
+		import json
+		import os
+
+		# make sure all objects are in the <objects> list
+		self.deselect_object()
+		# make sure we don't save an empty scene
+		if not objects: return messagebox.showerror("Scene is empty", "Cannot save an empty scene")
+		# choose a name for the scene
+		scene_name = choose_name(self.root)
+		if not scene_name: return
+		scene_name = scene_name.upper()
+
+		scene = {}
+		counter = {"Tracker": 0, "Image": 0}
+		# transform all objects into a dictionary
+		for o in objects:
+			if isinstance(o, tuple):
+				scene["Image_"+str(counter["Image"])] = {"file": o[1], "x1": int(o[2]), "y1": int(o[3]), "x2": int(o[4]), "y2": int(o[5])}
+				counter["Image"] += 1
+			if isinstance(o, Tracker):
+				scene["Tracker_"+str(counter["Tracker"])] = {x: y for (x,y) in o.__dict__.items() if not x.startswith("i_")}
+				counter["Tracker"] += 1
+		
+		# load all scenes
+		scenes = {}
+		if os.path.exists(__location__+__scene_file__):
+			with open(__location__+__scene_file__, "r") as file:
+				scenes = json.loads(file.read())
+		# resolve duplicates
+		if scene_name in scenes:
+			answer = messagebox.askretrycancel("Scene already exists", f"Scene {scene_name} already exists. Do you wish to overwrite it?")
+			if not answer: return
+		# append to all scenes and save the file again
+		scenes[scene_name] = scene
+		with open(__location__+__scene_file__, "w") as file:
+			file.write(json.dumps(scenes, separators=(',', ':')))
+		
+		# make sure we know what scene we currently have
+		self.scene_changed.set(False)
+		self.scene_name = scene_name
+		self.info_text.set(scene=scene_name)
+	
+	def load_scene(self):
+		import json
+		import os
+
+		# warn the user about possible data loss
+		if objects or self.transform_object != None:
+			answer = messagebox.askretrycancel("Overwrite scene", "Do you wish to overwrite the current scene? (all unsaved changes will be lost)")
+			if not answer: return
+
+		# load all scenes from a save file
+		scenes = {}
+		if os.path.exists(__location__+__scene_file__):
+			with open(__location__+__scene_file__, "r") as file:
+				scenes = json.loads(file.read())
+		if not scenes: return messagebox.showerror("Cannot load scene", "No scenes are saved")
+		
+		# let user choose a scene to load
+		scene_name = choose_scene(self.root, scenes)
+		if not scene_name: return
+		scene = scenes[scene_name]
+		
+		# remove all objects from the current scene
+		self.deselect_object()
+		while objects:
+			o = objects[0]
+			self.delete_object(obj=o)
+		
+		# load objects from the scene and add them onto the canvas
+		for obj_name, values in scene.items():
+			if not "_" in obj_name: continue
+			name = obj_name.split("_")[0]
+			if name.lower() == "tracker":
+				objects.append(Tracker(values["x"], values["y"], values["width"], values["height"], bg_margin=values["bg_margin"], mode=values["mode"]))
+				objects[-1].tk_draw(self.canvas)
+			if name.lower() == "image":
+				self.load_image_to_canvas(create_image(values["file"]), values["x1"], values["y1"])
+		
+		# make sure we know what scene we currently have
+		self.scene_changed.set(False)
+		self.scene_name = scene_name
+		self.info_text.set(scene=scene_name)
+
+	def load_image_to_canvas(self, img=None, x1=None, y1=None):
 		"""Load and display an image to canvas."""
-		# ChooseImage() needs to be a class
-		img = ChooseImage()
+		if not img: img = choose_image()
 		if not img: return
-		img_id = self.canvas.create_image(self.canvas.winfo_width()/2 - img.width() / 2, self.canvas.winfo_height()/2 - img.height() / 2, image=img, anchor="nw")
+		img, filepath = img
+		img_id = self.canvas.create_image(x1 or self.canvas.winfo_width()/2 - img.width() / 2, y1 or self.canvas.winfo_height()/2 - img.height() / 2, image=img, anchor="nw")
 		x, y = self.canvas.coords(img_id)
-		objects.append((img_id, x, y, x+img.width(), y+img.height()))
+		objects.append((img_id, filepath, x, y, x+img.width(), y+img.height()))
 		self.canvas.tag_lower(img_id)
+		self.scene_changed.set(True)
 
 	def change_marker_button_state(self, state):
 		"""Change style of the <Draw marker> button."""
@@ -463,9 +685,9 @@ class UI(tk.Frame):
 		self.transform_object.set(None)
 		self.canvas.config(cursor="")
 
-	def delete_object(self, *args, **kwargs):
+	def delete_object(self, *args, obj=None, **kwargs):
 		"""Deletes the selected object."""
-		obj = self.transform_object.object
+		if not obj: obj = self.transform_object.object
 		if obj in objects: objects.remove(obj)
 		if isinstance(obj, Tracker):
 			obj.tk_undraw(self.canvas)
@@ -482,7 +704,7 @@ class UI(tk.Frame):
 			objects.insert(0, self.transform_object.object)
 		elif isinstance(self.transform_object.object, tuple):
 			obj = self.transform_object.object
-			objects.append((obj[0],) + self.canvas_transform.coords())
+			objects.append((obj[0],obj[1]) + self.canvas_transform.coords())
 		self.reset_transform()
 	
 	def display_object_properties(self, object_):
@@ -503,8 +725,8 @@ class UI(tk.Frame):
 			prop.add_delete()
 		elif isinstance(object_, tuple):
 			prop.add_title("Image")
-			prop.add_property("Width:",  object_[3]-object_[1])
-			prop.add_property("Height:", object_[4]-object_[2])
+			prop.add_property("Width:",  object_[4]-object_[2])
+			prop.add_property("Height:", object_[5]-object_[3])
 			prop.add_separator(5)
 			prop.add_deselect()
 			prop.add_delete()
@@ -565,7 +787,7 @@ class UI(tk.Frame):
 				if isinstance(o, Tracker):
 					x1, y1, x2, y2 = (o.x, o.y, o.x+o.width, o.y+o.height)
 				elif isinstance(o, tuple):
-					x1, y1, x2, y2 = o[1:]
+					x1, y1, x2, y2 = o[2:]
 					self.canvas_transform.show_handles = False
 				elif isinstance(o, int):
 					x1, y1, x2, y2 = self.canvas.coords(o)
@@ -575,16 +797,6 @@ class UI(tk.Frame):
 					self.canvas_transform.create(self.canvas, x1, y1, x2, y2)
 					self.transform_state.set(True)
 					return
-			self.transform_object.set(None)
-
-		def deselect_object():
-			if self.transform_object == None: return
-			if isinstance(self.transform_object.object, Tracker):
-				self.transform_object.object.tk_draw(self.canvas)
-				objects.insert(0, self.transform_object.object)
-			elif isinstance(self.transform_object.object, tuple):
-				obj = self.transform_object.object
-				objects.append((obj[0],) + self.canvas_transform.coords())
 			self.transform_object.set(None)
 
 		def apply_transformations():
@@ -624,11 +836,9 @@ class UI(tk.Frame):
 			self.canvas.mouse_down = True
 			self.canvas.mouse_coords = coords(event)
 			if self.transform_state:
-				# if user clicks away from the transform, remove the transformation manager
+				# if user clicks away from the object, deselect it
 				if self.transform_mode == "none":
-					deselect_object()
-					self.canvas_transform.delete(self.canvas)
-					self.transform_state.set(False)
+					self.deselect_object()
 				set_transform_mode(x, y)
 				self.canvas_transform.init_drag(x, y) # set up the transformation manager
 				self.canvas.config(cursor=self.transform_mode.to_cursor())
@@ -644,7 +854,7 @@ class UI(tk.Frame):
 			# get event coords
 			x, y = coords(event)
 			# update the footer info
-			self.i_coords.set(x=x, y=y)
+			self.info_text.set(x=x, y=y)
 			self.canvas.mouse_coords = coords(event)
 			if self.transform_state:
 				# if the mouse is held down, perform the transformation
@@ -652,6 +862,7 @@ class UI(tk.Frame):
 					self.transform_mode.fixed = self.canvas.shift_down
 					self.canvas_transform.adjust(self.canvas, self.transform_mode, x, y)
 					apply_transformations()
+					self.scene_changed.set(True)
 				# if it's not, just update the cursor
 				if not self.canvas.mouse_down:
 					set_transform_mode(x, y)
@@ -673,10 +884,12 @@ class UI(tk.Frame):
 				# create a Tracker at marker coordinates and select it
 				x1, y1, x2, y2 = self.canvas_marker.delete(self.canvas)
 				self.marker_state.set(False)
+				self.canvas_transform.show_handles = True
 				self.transform_object.set(Tracker(x1, y1, x2-x1, y2-y1, mode="TOPLEFT"))
 				self.transform_object.object.tk_draw(self.canvas)
 				self.canvas_transform.create(self.canvas, x1, y1, x2, y2)
 				self.transform_state.set(True)
+				self.scene_changed.set(True)
 		
 		# set up the canvas and local variables
 		self.canvas_marker = SelectionManager()
