@@ -456,6 +456,13 @@ class UI(tk.Frame):
 		if state: self.draw_marker_button.config(fg="red", relief="sunken")
 		else: self.draw_marker_button.config(fg="black", relief="raised")
 
+	def reset_transform(self):
+		self.canvas_transform.delete(self.canvas)
+		self.transform_mode.set("none", False)
+		self.transform_state.set(False)
+		self.transform_object.set(None)
+		self.canvas.config(cursor="")
+
 	def delete_object(self, *args, **kwargs):
 		"""Deletes the selected object."""
 		obj = self.transform_object.object
@@ -466,10 +473,7 @@ class UI(tk.Frame):
 			self.canvas.delete(obj[0])
 		elif isinstance(obj, int):
 			self.canvas.delete(obj)
-		self.canvas_transform.delete(self.canvas)
-		self.transform_state.set(False)
-		self.transform_object.set(None)
-		self.canvas.config(cursor="")
+		self.reset_transform()
 
 	def deselect_object(self, *args, **kwargs):
 		if self.transform_object == None: return
@@ -479,9 +483,7 @@ class UI(tk.Frame):
 		elif isinstance(self.transform_object.object, tuple):
 			obj = self.transform_object.object
 			objects.append((obj[0],) + self.canvas_transform.coords())
-		self.transform_object.set(None)
-		self.canvas_transform.delete(self.canvas)
-		self.transform_state.set(False)
+		self.reset_transform()
 	
 	def display_object_properties(self, object_):
 		"""Display the info and adjustable properties onto the sidebar."""
@@ -684,6 +686,7 @@ class UI(tk.Frame):
 		self.canvas.bind("<ButtonRelease-1>", mouse_release)
 		self.root.bind("<KeyPress>", key_press)
 		self.root.bind("<KeyRelease>", key_release)
+		self.root.bind("<Escape>", self.deselect_object)
 		self.canvas.mouse_down = False
 		self.canvas.shift_down = False
 		self.canvas.mouse_coords = (0, 0)
