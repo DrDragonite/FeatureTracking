@@ -599,7 +599,8 @@ class UI(tk.Frame):
 
 		def key_press(event):
 			key = event.keycode
-			self.canvas.shift_down = key == 16
+			if key == 16:
+				self.canvas.shift_down = True
 			if self.canvas.mouse_down:
 				c = self.canvas.mouse_coords
 				self.transform_mode.fixed = self.canvas.shift_down
@@ -608,7 +609,8 @@ class UI(tk.Frame):
 		
 		def key_release(event):
 			key = event.keycode
-			self.canvas.shift_down = not key == 16
+			if key == 16:
+				self.canvas.shift_down = False
 			if self.canvas.mouse_down:
 				c = self.canvas.mouse_coords
 				self.transform_mode.fixed = self.canvas.shift_down
