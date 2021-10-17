@@ -9,11 +9,11 @@ class Tracker:
 		self.i_bg_rect = None
 
 	def set(self, x=None, y=None, width=None, height=None, bg_margin=None, mode=None) -> None:
-		self.x         = x         if isinstance(x, NUMBER)         else self.x
-		self.y         = y         if isinstance(y, NUMBER)         else self.y
-		self.width     = width     if isinstance(width, NUMBER)     else self.width
-		self.height    = height    if isinstance(height, NUMBER)    else self.height
-		self.bg_margin = bg_margin if isinstance(bg_margin, NUMBER) else self.bg_margin
+		self.x         = int(x)         if isinstance(x, NUMBER)         else self.x
+		self.y         = int(y)         if isinstance(y, NUMBER)         else self.y
+		self.width     = int(width)     if isinstance(width, NUMBER)     else self.width
+		self.height    = int(height)    if isinstance(height, NUMBER)    else self.height
+		self.bg_margin = int(bg_margin) if isinstance(bg_margin, NUMBER) else self.bg_margin
 		self.bg_width  = self.width  + self.bg_margin * 2
 		self.bg_height = self.height + self.bg_margin * 2
 		if mode and (not isinstance(mode, str) or not mode.upper() in MODES):

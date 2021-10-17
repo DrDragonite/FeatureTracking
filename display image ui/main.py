@@ -366,7 +366,7 @@ class TransformManager:
 		x1, y1, x2, y2 = (self.x1, self.y1, self.x2, self.y2)
 		if x1 > x2: x2 = x2 + x1; x1 = x2 - x1; x2 = x2 - x1
 		if y1 > y2: y2 = y2 + y1; y1 = y2 - y1; y2 = y2 - y1
-		return (x1, y1, x2, y2)
+		return (int(x1), int(y1), int(x2), int(y2))
 
 images = []
 def choose_image():
@@ -540,6 +540,12 @@ class UI(tk.Frame):
 		self.root.resizable(0, 0)
 		self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
+		# set up the shortcuts
+		self.root.bind("<Control-o>", self.load_scene)
+		self.root.bind("<Control-s>", self.save_scene)
+		self.root.bind("<Control-e>", self.save_scene_as)
+		self.root.bind("<Control-d>", self.deselect_object)
+
 		# set up globals
 		self.transform_object = ObjectSwitch()
 		self.transform_state = BoolSwitch()
@@ -565,8 +571,9 @@ class UI(tk.Frame):
 
 		menubar = tk.Menu(root)
 		file_menu = tk.Menu(menubar, tearoff=0)
-		file_menu.add_command(label="Load", command=self.load_scene)
-		file_menu.add_command(label="Save", command=self.save_scene)
+		file_menu.add_command(label="Load", accelerator="Ctrl+O", command=self.load_scene)
+		file_menu.add_command(label="Save", accelerator="Ctrl+S", command=self.save_scene)
+		file_menu.add_command(label="Save As", accelerator="Ctrl+E", command=self.save_scene_as)
 		file_menu.add_command(label="Delete", command=self.delete_scene)
 		file_menu.add_separator()
 		file_menu.add_command(label="Exit", command=self.quit)
@@ -617,17 +624,15 @@ class UI(tk.Frame):
 		if self.scene_changed and not messagebox.askretrycancel("Quit", "Are you sure you want to quit? (All the unsaved changes will be lost)"): return
 		self.root.quit()
 
-	def save_scene(self):
-		import json
-		import os
-
+	def save_scene(self, *a):
+		import json, os
 		# make sure all objects are in the <objects> list
 		self.deselect_object()
 		# make sure we don't save an empty scene
-		if not objects: return messagebox.showerror("Scene is empty", "Cannot save an empty scene")
+		if not objects: messagebox.showerror("Scene is empty", "Cannot save an empty scene"); return 0
 		# choose a name for the scene
-		scene_name = choose_name(self.root)
-		if not scene_name: return
+		scene_name = self.scene_name
+		if not scene_name: return self.save_scene_as()
 		scene_name = scene_name.upper()
 
 		scene = {}
@@ -646,10 +651,6 @@ class UI(tk.Frame):
 		if os.path.exists(__location__+__scene_file__):
 			with open(__location__+__scene_file__, "r") as file:
 				scenes = json.loads(file.read())
-		# resolve duplicates
-		if scene_name in scenes:
-			answer = messagebox.askretrycancel("Scene already exists", f"Scene {scene_name} already exists. Do you wish to overwrite it?")
-			if not answer: return
 		# append to all scenes and save the file again
 		scenes[scene_name] = scene
 		with open(__location__+__scene_file__, "w") as file:
@@ -659,8 +660,44 @@ class UI(tk.Frame):
 		self.scene_changed.set(False)
 		self.scene_name = scene_name
 		self.info_text.set(scene=scene_name)
+
+		return 1
+
+	def save_scene_as(self, *a):
+		import os, json
+		# make sure all objects are in the <objects> list
+		self.deselect_object()
+		# make sure we don't save an empty scene
+		if not objects: return messagebox.showerror("Scene is empty", "Cannot save an empty scene")
+		# choose a name for the scene
+		scene_name = choose_name(self.root)
+		if not scene_name: return
+		scene_name = scene_name.upper()
+
+		scenes = {}
+		if os.path.exists(__location__+__scene_file__):
+			with open(__location__+__scene_file__, "r") as file:
+				scenes = json.loads(file.read())
+		# resolve duplicates
+		if scene_name in scenes:
+			answer = messagebox.askretrycancel("Scene already exists", f"Scene {scene_name} already exists. Do you wish to overwrite it?")
+			if not answer: return 0
+
+		# save the current scene state
+		b_scene_changed = self.scene_changed.state
+		b_scene_name = self.scene_name
+
+		# load the values for save_scene() to read
+		self.scene_changed.set(False)
+		self.scene_name = scene_name
+
+		# try to save, and if it didn't save, restore values
+		saved = self.save_scene()
+		if not saved:
+			self.scene_changed.set(b_scene_changed)
+			self.scene_name = b_scene_name
 	
-	def load_scene(self):
+	def load_scene(self, *a):
 		import json
 		import os
 
