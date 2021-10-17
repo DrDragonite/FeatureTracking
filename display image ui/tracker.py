@@ -14,11 +14,14 @@ class Tracker:
 		self.width     = width     if isinstance(width, NUMBER)     else self.width
 		self.height    = height    if isinstance(height, NUMBER)    else self.height
 		self.bg_margin = bg_margin if isinstance(bg_margin, NUMBER) else self.bg_margin
-		self.bg_width  = self.width  + self.bg_margin
-		self.bg_height = self.height + self.bg_margin
+		self.bg_width  = self.width  + self.bg_margin * 2
+		self.bg_height = self.height + self.bg_margin * 2
 		if mode and (not isinstance(mode, str) or not mode.upper() in MODES):
 			raise Exception("Invalid mode")
 		self.mode = mode if mode else self.mode
+
+	def offset(self, x, y):
+		return type(self)(self.x - x, self.y - y, self.width, self.height, bg_margin=self.bg_margin, mode=self.mode)
 
 	def tk_draw(self, canvas):
 		if not self.i_fg_rect: self.i_fg_rect = canvas.create_rectangle(0, 0, 0, 0, outline="#00ff00", fill=None)
@@ -56,14 +59,14 @@ class Tracker:
 		x_off = 0
 		y_off = 0
 		if self.mode == "CENTER":
-			x_off = self.bg_width
-			y_off = self.bg_height
+			x_off = self.bg_width  // 2
+			y_off = self.bg_height // 2
 
 		# calculate coordinates with offset applied
 		x1_o = self.x - self.bg_margin - x_off
 		y1_o = self.y - self.bg_margin - y_off
-		x2_o = x1_o + self.bg_width  + self.bg_margin
-		y2_o = y1_o + self.bg_height + self.bg_margin
+		x2_o = x1_o + self.bg_width
+		y2_o = y1_o + self.bg_height
 
 		# return the coordinates
 		return (x1_o, y1_o, x2_o, y2_o)
@@ -75,10 +78,10 @@ class Tracker:
 
 		# calculate border-constrained coordinates
 		x1, y1, x2, y2 = self.fg_coords()
-		x1_c = constrain(x1, 0, image_width)
-		y1_c = constrain(y1, 0, image_height)
-		x2_c = constrain(x2, 0, image_width)
-		y2_c = constrain(y2, 0, image_height)
+		x1_c = int(constrain(x1, 0, image_width))
+		y1_c = int(constrain(y1, 0, image_height))
+		x2_c = int(constrain(x2, 0, image_width))
+		y2_c = int(constrain(y2, 0, image_height))
 
 		for y in range(y1_c, y2_c):
 			# get the edges of a horizontal "strip" of the foreground
@@ -86,7 +89,7 @@ class Tracker:
 			i_end   = x2_c + y * image_width
 
 			# add said strip to the foreground array
-			foreground.append(pixels[int(i_start):int(i_end)])
+			foreground += pixels[int(i_start):int(i_end)]
 
 		# return the foreground array
 		return foreground
@@ -98,10 +101,10 @@ class Tracker:
 
 		# calculate border-constrained coordinates
 		x1, y1, x2, y2 = self.bg_coords()
-		x1_c = constrain(x1, 0, image_width)
-		y1_c = constrain(y1, 0, image_height)
-		x2_c = constrain(x2, 0, image_width)
-		y2_c = constrain(y2, 0, image_height)
+		x1_c = int(constrain(x1, 0, image_width))
+		y1_c = int(constrain(y1, 0, image_height))
+		x2_c = int(constrain(x2, 0, image_width))
+		y2_c = int(constrain(y2, 0, image_height))
 
 		for y in range(y1_c, y2_c):
 			# get the edges of a horizontal "strip" of the background
@@ -109,16 +112,17 @@ class Tracker:
 			i_end   = x2_c + y * image_width
 
 			# add said strip to the background array
-			background.append(pixels[int(i_start):int(i_end)])
+			background += pixels[int(i_start):int(i_end)]
 
 		# return the background array
 		return background
 
 	def is_fg(self, x, y):
-		return x > self.bg_margin and x < self.bg_width - self.bg_margin * 2 and y > self.bg_margin and y < self.bg_height - self.bg_margin * 2
+		return x >= 0 and x < self.width and y >= 0 and y < self.height
 	
 	def is_bg(self, x, y):
-		return not self.is_fg(x, y)
+		#return x > -self.bg_margin and x < self.bg_width and y > -self.bg_margin and y < self.bg_height
+		return x >= -self.bg_margin and x < self.width + self.bg_margin and y >= -self.bg_margin and y < self.height + self.bg_margin
 
 	def __str__(self) -> str:
 		self.set()

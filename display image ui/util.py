@@ -14,9 +14,13 @@ def round(value: float) -> int:
 	"""Round a float to an integer"""
 	return int(value + 0.5)
 
-def get_coord(index: int, width: int, height: int) -> tuple:
+def index_to_coords(index: int, width: int, height: int) -> tuple:
 	"""Get X and Y coordinates from a 1D index"""
-	return (index / height, index % height)
+	return (index % width, index // width)
+
+def coords_to_index(x: int, y: int, width: int) -> tuple:
+	"""Get 1D index coordinates x and y."""
+	return x + y * width
 
 def map_range(values: list, input_start: float, input_end: float, output_start: float, output_end: float) -> list:
 	"""Returns given values mapped from input range to output range."""
@@ -40,81 +44,95 @@ def histogram(values: list, b_count: int, range_from: int, range_to: int) -> lis
 def most_common(values: list):
 	"""Returns the most common element from a list of elements."""
 	from collections import Counter
-	return Counter(values).most_common(1)[0]
+	return Counter(values).most_common(1)[0][0]
 
+def frequency(values: list, value: int):
+	max_  = len(values)
+	count = len([x for x in values if x == value])
+	return count / max_
 
-def normalize_rgb(pixels: list) -> list:
-	"""Returns a list of normalized RGB values from list of RGB tuples."""
-	return [(int(rgb[0] / sum(rgb) * 255), int(rgb[1] / sum(rgb) * 255), int(rgb[2] / sum(rgb) * 255)) for rgb in list(pixels)]
+def normalize_rgb(pixel: tuple) -> list:
+	"""Returns normalized RGB value."""
+	return (int(pixel[0] / sum(pixel) * 255), int(pixel[1] / sum(pixel) * 255), int(pixel[2] / sum(pixel) * 255))
 
-def log_likelihood_ratio(fg: list, bg: list) -> float:
-	from math import log2
+def log_likelihood_ratio(fg: list, bg: list, i: int) -> float:
+	from math import log10
 
 	# tiny_number = 0.0001
-	# fraction = max(fg_f, tiny_number) / max(fg_f, tiny_number)
+	# fg_f = frequency(fg, i)
+	# bg_f = frequency(bg, i)
+	# fraction = max(fg_f, tiny_number) / max(bg_f, tiny_number)
 	# result1 = log2(fraction)
-	# result  = max(-1, min(result1))
+	# result  = max(-1, min(1, result1))
+	return max(-1, min(1, log10(max(frequency(fg, i), 0.0001) / max(frequency(bg, i), 0.001))))
 
-	return max(-1, min(1, log2(max(most_common(fg), 0.0001) / max(most_common(bg), 0.0001))))
-	
+def likelihood_image(image, tracker, mode = "RGB", precision = 64) -> list:
+	from PIL import Image
 
-def likelihood_image(image, tracker, mode = "R", precision = 5) -> list:
-	# get the image pixel and size data
+	# constrain the precision
+	precision = constrain(precision, 1, 255)
+
+	# load image data
 	pix = list(image.convert("RGB").getdata())
 	w = image.width 
 	h = image.height
 
-	# get the tracked pixels in RGB tuples
-	fg_p = tracker.get_fg(pix, w, h)
-	bg_p = tracker.get_bg(pix, w, h)
+	# shorten tracker variables
+	tx = tracker.x
+	ty = tracker.y
+	tw = tracker.width
+	th = tracker.height
+	bw = tracker.bg_width
+	bh = tracker.bg_height
+	bm = tracker.bg_margin
 
-	# channel count
-	cc = 1
+	# prepare the getter function
+	def R(rgb): return int(rgb[0])
+	def G(rgb): return int(rgb[1])
+	def B(rgb): return int(rgb[2])
+	def r(rgb): return int(rgb[0]/sum(rgb)*255)
+	def g(rgb): return int(rgb[1]/sum(rgb)*255)
+	def b(rgb): return int(rgb[2]/sum(rgb)*255)
+	def avg(*val): return sum(val)//len(val)
+	def get(x, loc):
+		loc["x"] = x
+		return eval("avg("+",".join([x+"(x)" for x in list(mode)])+")", loc)
 
-	# foreground and background value lists
-	fg = [0] * len(fg_p)
-	bg = [0] * len(bg_p)
+	# prepare arrays and set globals
+	img = ["0"] * (w * h)
+	fg  = ["0"] * (tw * th)
+	bg  = ["0"] * (bw * bh - tw * th)
+	fg_c = 0
+	bg_c = 0
+	for i, rgb in enumerate(pix):
+		# differentiate between foreground and background
+		x, y  = index_to_coords(i, w, h)
+		is_fg = tracker.is_fg(x - tx, y - ty)
+		is_bg = tracker.is_bg(x - tx, y - ty)
+		# get the pixel value based on the mode
+		val = get(rgb, locals())
 
-	j = 0
-	# add and mix in the desired values
-	for i, rgb in enumerate(bg_p):
-		x, y = get_coord(i, w, h)
-		is_fg = tracker.is_fg(x, y)
+		# limit the amount of values to precision
+		val = int(val / 255 * precision)
 
-		# unchanged pixel values (RGB)
-		if "R" in mode:
-			fg[j] = fg[j] + int((rgb[0] - fg[j]) / cc * is_fg)
-			bg[i] = bg[i] + int((rgb[0] - bg[i]) / cc)
-			cc += 1
-		if "G" in mode:
-			fg[j] = fg[j] + int((rgb[1] - fg[j]) / cc * is_fg)
-			bg[i] = bg[i] + int((rgb[1] - bg[i]) / cc)
-			cc += 1
-		if "B" in mode:
-			fg[j] = fg[j] + int((rgb[2] - fg[j]) / cc * is_fg)
-			bg[i] = bg[i] + int((rgb[2] - bg[i]) / cc)
-			cc += 1
+		# set the values
+		img[i] = val
+		if   is_fg: fg[fg_c] = val; fg_c += 1
+		elif is_bg: bg[bg_c] = val; bg_c += 1
+
+	# handle clipping out of image
+	fg = list(filter(lambda x: x != "0", fg))
+	bg = list(filter(lambda x: x != "0", bg))
+	if not fg or not bg: return
 	
-		# normalized pixel values (rgb)
-		if "r" in mode:
-			fg[j] = fg[j] + int((rgb[0] / sum(rgb) * 255 - fg[j]) / cc * is_fg)
-			bg[i] = bg[i] + int((rgb[0] / sum(rgb) * 255 - bg[i]) / cc)
-			cc += 1
-		if "g" in mode:
-			fg[j] = fg[j] + int((rgb[1] / sum(rgb) * 255 - fg[j]) / cc * is_fg)
-			bg[i] = bg[i] + int((rgb[1] / sum(rgb) * 255 - bg[i]) / cc)
-			cc += 1
-		if "b" in mode:
-			fg[j] = fg[j] + int((rgb[2] / sum(rgb) * 255 - fg[j]) / cc * is_fg)
-			bg[i] = bg[i] + int((rgb[2] / sum(rgb) * 255 - bg[i]) / cc)
-			cc += 1
+	# calculate the ratios
+	ratios = [log_likelihood_ratio(fg, bg, x) for x in range(precision+1)]
 
-		fg[j] = map_range_int(fg[j], 0, 255, 0, pow(2, precision))
-		bg[i] = map_range_int(bg[i], 0, 255, 0, pow(2, precision))
-		j += is_fg
-		
-	
-	rt = log_likelihood_ratio(fg, bg)
+	# apply the ratios to the image
+	l_img = [(ratios[x] + 1) * 128 for x in img]
 
-	print(rt)
+	# display the image
+	l_image = Image.new("L", (w, h))
+	l_image.putdata(l_img)
+	return l_image
 

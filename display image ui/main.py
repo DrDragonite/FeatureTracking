@@ -1,10 +1,11 @@
 from itertools import count
 from math import exp
+from sys import platform
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkinter.scrolledtext import ScrolledText
 from tracker import Tracker
-from PIL import ImageTk
+from PIL import Image, ImageTk
 
 class Console(ScrolledText):
 	def __init__(self, *args, **kwargs) -> None:
@@ -56,7 +57,7 @@ class InfoText(tk.Label):
 		for key, value in kwargs.items():
 			self.infodict[key] = value
 			if key == "scene" and value == "":
-				self.infodict[key] = "<Unknown>"
+				self.infodict[key] = "<Unnamed>"
 		self.update_info()
 
 class ObjectInfo:
@@ -389,6 +390,7 @@ def choose_name(root: tk.Tk, text: str = "Enter a name:"):
 	new_window.geometry("%dx%d+%d+%d" % (w, h, wx + (ww - w) //2, wy + (wh - h) // 2))
 	new_window.resizable(0, 0)
 	new_window.title("Input")
+	new_window.focus_force()
 	new_window.grab_set()
 
 	string_var = tk.StringVar()
@@ -427,6 +429,7 @@ def choose_scene(root: tk.Tk, scenes: dict):
 	new_window.geometry("%dx%d+%d+%d" % (w, h, wx + (ww - w) //2, wy + (wh - h) // 2))
 	new_window.resizable(0, 0)
 	new_window.title("Input")
+	new_window.focus_force()
 	new_window.grab_set()
 
 	new_window.columnconfigure(0, weight=1)
@@ -494,6 +497,32 @@ def choose_scene(root: tk.Tk, scenes: dict):
 
 	new_window.mainloop()
 	return string_var.get()
+
+def display_image(root: tk.Tk, image: Image):
+	w, h, wx, wy, ww, wh = (image.width, image.height, root.winfo_x(), root.winfo_y(), root.winfo_width(), root.winfo_height())
+	new_window = tk.Toplevel(root)
+	new_window.geometry("%dx%d+%d+%d" % (w, h, wx + (ww - w) //2, wy + (wh - h) // 2))
+	new_window.resizable(0, 0)
+	new_window.title("Image")
+	new_window.focus_force()
+	new_window.grab_set()
+
+	canvas = tk.Canvas(new_window, bg="white", bd=-2)
+	canvas.pack(fill="both", expand=1)
+
+	global img
+	img = ImageTk.PhotoImage(image)
+	canvas.create_image(0, 0, image=img, anchor="nw")
+
+	def window_exit(*a, **k):
+		new_window.quit()
+		new_window.destroy()
+
+	new_window.bind("<Escape>", window_exit)
+	new_window.bind("<Return>", window_exit)
+	new_window.protocol("WM_DELETE_WINDOW", window_exit)
+
+	new_window.mainloop()
 
 __location__ = __file__[:__file__.rfind("/")+1]
 __scene_file__ = "objects.json"
@@ -566,6 +595,12 @@ class UI(tk.Frame):
 		self.load_scene_button = tk.Button(self.sidebar, text="Load Scene", command=self.load_scene)
 		self.load_scene_button.pack(side="top", pady=5)
 
+		self.delete_scene_button = tk.Button(self.sidebar, text="Delete Scene", command=self.delete_scene)
+		self.delete_scene_button.pack(side="top", pady=5)
+
+		self.calculate_likelihood_button = tk.Button(self.sidebar, text="Calculate Likelihood", command=self.calculate_likelihood)
+		self.calculate_likelihood_button.pack(side="top", pady=5)
+
 		separator = ttk.Separator(self.sidebar, orient="horizontal")
 		separator.pack(fill="x", padx=5, pady=5)
 
@@ -595,7 +630,7 @@ class UI(tk.Frame):
 		# transform all objects into a dictionary
 		for o in objects:
 			if isinstance(o, tuple):
-				scene["Image_"+str(counter["Image"])] = {"file": o[1], "x1": int(o[2]), "y1": int(o[3]), "x2": int(o[4]), "y2": int(o[5])}
+				scene["Image_"+str(counter["Image"])] = {"file": o[1].replace(__location__, "$"), "x1": int(o[2]), "y1": int(o[3]), "x2": int(o[4]), "y2": int(o[5])}
 				counter["Image"] += 1
 			if isinstance(o, Tracker):
 				scene["Tracker_"+str(counter["Tracker"])] = {x: y for (x,y) in o.__dict__.items() if not x.startswith("i_")}
@@ -655,12 +690,60 @@ class UI(tk.Frame):
 				objects.append(Tracker(values["x"], values["y"], values["width"], values["height"], bg_margin=values["bg_margin"], mode=values["mode"]))
 				objects[-1].tk_draw(self.canvas)
 			if name.lower() == "image":
-				self.load_image_to_canvas(create_image(values["file"]), values["x1"], values["y1"])
+				self.load_image_to_canvas(create_image(values["file"].replace("$", __location__)), values["x1"], values["y1"])
 		
 		# make sure we know what scene we currently have
 		self.scene_changed.set(False)
 		self.scene_name = scene_name
 		self.info_text.set(scene=scene_name)
+
+	def delete_scene(self):
+		import json
+		import os
+
+		# warn the user about possible data loss
+		if not objects and not self.transform_object:
+			return messagebox.showerror("Cannot delete scene", "Scene is empty")
+
+		if not self.scene_name:
+			return messagebox.showerror("Cannot delete scene", "No scene loaded")
+
+		answer = messagebox.askretrycancel("Delete scene", f"Are you sure you want to delete scene {self.scene_name or '<Unnamed>'}?")
+		if not answer: return
+		
+		scenes = {}
+		# delete the scene from the file
+		if os.path.exists(__location__+__scene_file__):
+			with open(__location__+__scene_file__, "r") as file:
+				scenes = json.loads(file.read())
+		if scenes:
+			del scenes[self.scene_name]
+			with open(__location__+__scene_file__, "w") as file:
+				file.write(json.dumps(scenes, separators=(',', ':')))
+
+		# remove all objects from the current scene
+		self.deselect_object()
+		while objects:
+			o = objects[0]
+			self.delete_object(obj=o)
+		
+		# reset scene
+		self.scene_changed.set(False)
+		self.scene_name = ""
+		self.info_text.set(scene="")
+
+	def calculate_likelihood(self):
+		from util import likelihood_image
+		self.deselect_object()
+
+		tracker = ([x for x in objects if type(x) is Tracker] or [None])[0]
+		img = ([x for x in objects if type(x) is tuple] or [None])[0]
+		if img is None or tracker is None: return messagebox.showerror("Cannot calculate likelihood", "Not enough info")
+
+		image = Image.open(img[1])
+		tracker = tracker.offset(img[2], img[3])
+		display_image(self.root, likelihood_image(image, tracker))
+
 
 	def load_image_to_canvas(self, img=None, x1=None, y1=None):
 		"""Load and display an image to canvas."""
@@ -810,8 +893,9 @@ class UI(tk.Frame):
 				self.canvas.coords(self.transform_object.object, x1, y1, x2, y2)
 
 		def key_press(event):
+			import sys
 			key = event.keycode
-			if key == 16:
+			if key == (16 if sys.platform == "win32" else 50):
 				self.canvas.shift_down = True
 			if self.canvas.mouse_down:
 				c = self.canvas.mouse_coords
@@ -820,8 +904,9 @@ class UI(tk.Frame):
 				apply_transformations()
 		
 		def key_release(event):
+			import sys
 			key = event.keycode
-			if key == 16:
+			if key == (16 if sys.platform == "win32" else 50):
 				self.canvas.shift_down = False
 			if self.canvas.mouse_down:
 				c = self.canvas.mouse_coords
