@@ -64,7 +64,7 @@ def log_likelihood_ratio(fg: list, bg: list, i: int) -> float:
 	# fraction = max(fg_f, tiny_number) / max(bg_f, tiny_number)
 	# result1 = log2(fraction)
 	# result  = max(-1, min(1, result1))
-	return max(-1, min(1, log10(max(frequency(fg, i), 0.0001) / max(frequency(bg, i), 0.001))))
+	return max(-1, min(1, log10(max(frequency(fg, i), 0.0001) / max(frequency(bg, i), 0.0001))))
 
 def likelihood_image(image, tracker, mode = "RGB", precision = 64) -> list:
 	from PIL import Image
