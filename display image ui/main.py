@@ -538,6 +538,7 @@ class UI(tk.Frame):
 		self.root.title("Image GUI")
 		self.root.geometry("800x480")
 		self.root.resizable(0, 0)
+		self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
 		# set up globals
 		self.transform_object = ObjectSwitch()
@@ -561,6 +562,16 @@ class UI(tk.Frame):
 
 		self.displayframe = tk.Frame(self.mainframe, relief="groove", borderwidth=2)
 		self.displayframe.pack(side="top", fill="both", expand=1, anchor="n")
+
+		menubar = tk.Menu(root)
+		file_menu = tk.Menu(menubar, tearoff=0)
+		file_menu.add_command(label="Load", command=self.load_scene)
+		file_menu.add_command(label="Save", command=self.save_scene)
+		file_menu.add_command(label="Delete", command=self.delete_scene)
+		file_menu.add_separator()
+		file_menu.add_command(label="Exit", command=self.quit)
+		menubar.add_cascade(label="File", menu=file_menu)
+		self.root.config(menu=menubar)
 		
 		# necessary. why? because fuck tkinter
 		ttk.Label(self.sidebar, font=("Arial", 5), text=" "*40).pack()
@@ -581,22 +592,12 @@ class UI(tk.Frame):
 		self.info_text.set(scene=self.scene_name, x=0, y=0)
 		self.scene_changed.onchange = scene_changed
 
-
 		self.marker_state.onchange = self.change_marker_button_state
 		self.draw_marker_button = tk.Button(self.sidebar, text="Draw marker", command=self.marker_state.toggle)
 		self.draw_marker_button.pack(side="top", pady=5)
 
 		self.load_image_button = tk.Button(self.sidebar, text="Load image", command=self.load_image_to_canvas)
 		self.load_image_button.pack(side="top", pady=5)
-
-		self.save_scene_button = tk.Button(self.sidebar, text="Save Scene", command=self.save_scene)
-		self.save_scene_button.pack(side="top", pady=5)
-
-		self.load_scene_button = tk.Button(self.sidebar, text="Load Scene", command=self.load_scene)
-		self.load_scene_button.pack(side="top", pady=5)
-
-		self.delete_scene_button = tk.Button(self.sidebar, text="Delete Scene", command=self.delete_scene)
-		self.delete_scene_button.pack(side="top", pady=5)
 
 		self.calculate_likelihood_button = tk.Button(self.sidebar, text="Calculate Likelihood", command=self.calculate_likelihood)
 		self.calculate_likelihood_button.pack(side="top", pady=5)
@@ -611,6 +612,10 @@ class UI(tk.Frame):
 	def remove_focus(self, *args, **kwargs):
 		"""Remove focus from a text area."""
 		self.root.focus_set()
+
+	def quit(self):
+		if self.scene_changed and not messagebox.askretrycancel("Quit", "Are you sure you want to quit? (All the unsaved changes will be lost)"): return
+		self.root.quit()
 
 	def save_scene(self):
 		import json
