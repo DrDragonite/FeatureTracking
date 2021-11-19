@@ -1,6 +1,3 @@
-from itertools import count
-from math import exp
-from sys import platform
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkinter.scrolledtext import ScrolledText
@@ -784,6 +781,7 @@ class UI(tk.Frame):
 
 		image = Image.open(img[1])
 		tracker = tracker.offset(img[2], img[3])
+		
 		display_image(self.root, likelihood_image(image, tracker))
 
 
@@ -842,7 +840,6 @@ class UI(tk.Frame):
 			def set_tracker_bg(var):
 				self.transform_object.object.set(bg_margin=int(var.get() or "0"))
 				self.transform_object.object.tk_draw(self.canvas)
-			
 			prop.add_title("Tracker")
 			prop.add_numeric_property("BG size: ", default=object_.bg_margin, onchange=set_tracker_bg)	
 			prop.add_separator(5)
